@@ -1,4 +1,4 @@
-import type { Locator, Page } from "playwright";
+import type { ElementHandle, Locator, Page } from "playwright";
 import { controlUiE2eWaitTimeoutMs } from "./control-ui-e2e-readiness.ts";
 
 /** Click once native pointer routing has caught up with the entire iframe layout. */
@@ -8,7 +8,7 @@ export async function clickBoardWidgetControl(page: Page, control: Locator): Pro
   if (!target) {
     throw new Error("Board widget control is unavailable.");
   }
-  const elements = [target];
+  const elements: ElementHandle<Node>[] = [target];
   const pointer = await target.evaluateHandle((element) => {
     let event: PointerEvent | undefined;
     const observe = (received: Event) => {
@@ -39,15 +39,17 @@ export async function clickBoardWidgetControl(page: Page, control: Locator): Pro
     const layout = () =>
       Promise.all(
         elements.map((element) =>
-          element.evaluate(
-            (node) =>
-              new Promise<number[]>((resolve) => {
-                requestAnimationFrame(() => {
-                  const { x, y, width, height } = node.getBoundingClientRect();
-                  resolve([x, y, width, height, window.innerWidth, window.innerHeight]);
-                });
-              }),
-          ),
+          element.evaluate((node) => {
+            if (!(node instanceof Element)) {
+              throw new Error("Expected a widget frame element.");
+            }
+            return new Promise<number[]>((resolve) => {
+              requestAnimationFrame(() => {
+                const { x, y, width, height } = node.getBoundingClientRect();
+                resolve([x, y, width, height, window.innerWidth, window.innerHeight]);
+              });
+            });
+          }),
         ),
       );
     await target.waitForElementState("enabled", { timeout: controlUiE2eWaitTimeoutMs });
